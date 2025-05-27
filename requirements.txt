@@ -34,6 +34,7 @@ coolname==2.2.0
 cryptography==45.0.2
 cupshelpers==1.0
 cycler==0.11.0
+Cython==3.1.1
 dateparser==1.2.1
 dbus-python==1.2.18
 decorator==4.4.2
@@ -148,11 +149,12 @@ protobuf==6.31.0
 psutil==7.0.0
 ptyprocess==0.7.0
 py==1.10.0
+pybind11==2.13.6
 pycairo==1.20.1
 pycparser==2.22
 pycryptodomex==3.11.0
 pycups==2.0.1
-pydantic==2.11.4
+pydantic==2.11.5
 pydantic-extra-types==2.10.4
 pydantic-settings==2.9.1
 pydantic_core==2.33.2
@@ -170,6 +172,7 @@ PyQt5==5.15.6
 PyQt5-sip==12.9.1
 pyqtgraph==0.12.4
 pyRFC3339==1.1
+pyroomacoustics==0.8.4
 pyrsistent==0.18.1
 pytest==8.3.5
 python-apt==2.4.0+ubuntu4
@@ -228,7 +231,7 @@ tornado==6.5.1
 tqdm==4.67.1
 triton==3.3.0
 typer==0.15.4
-typing-inspection==0.4.0
+typing-inspection==0.4.1
 typing_extensions==4.13.2
 tzdata==2025.2
 tzlocal==5.3.1
