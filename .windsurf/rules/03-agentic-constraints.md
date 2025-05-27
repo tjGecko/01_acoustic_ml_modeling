@@ -48,3 +48,8 @@ trigger: manual
 - Update [[00_Overview]] when new features are added, dependencies change, or setup steps are modified.
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
+
+## Code Execution
+- Always change to the project root working directory (e.g. /home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root/) prior to code execution
+- Assert that you are using the project virtual environment (e.g. venv) to execute python or install dependencies. Warn me if not activated
+- Assert that each script has header documentation that describes how to manually run the script including venv activation
