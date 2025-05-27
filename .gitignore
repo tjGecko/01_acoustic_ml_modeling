@@ -120,6 +120,6 @@ pyrightconfig.json
 *.log
 
 # Ignore Obsidian workspace state
-00 - docs/05 - Obsidian Docs/.obsidian/workspace.json
+00_docs/v05_Gimbal_Angle/.obsidian/workspace.json
 
 # End of standard Python .gitignore
