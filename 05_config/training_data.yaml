@@ -1,0 +1,9 @@
+data_lake:
+  root_dir: "/home/tj/99_tmp/10 - drone acoustic data/01_raw_data/DroneAudioDataset/Binary_Drone_Audio/yes_drone/"
+  root_dir_info: "Location of all data assets: https://github.com/saraalemadi/DroneAudioDataset"
+  
+training_data_creation:
+  sliding_window_size: 4096
+  sliding_window_hop_size: 16
+  sliding_window_hop_size_info: "Number of samples to skip between sliding windows => 0.001 seconds (at 16kHz)"
+  tmp_dir: "/home/tj/99_tmp/10 - drone acoustic data/99_tmp/"
