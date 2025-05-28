@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from pathlib import Path
 import yaml
 import os
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from .d01_physical_mic_array import MicrophoneArray
 
@@ -92,7 +94,7 @@ class RoomDimensions(NumpyArrayModel):
     @classmethod
     def create_example(cls) -> 'RoomDimensions':
         """Create an example room configuration."""
-        return cls(width=75.0, length=50.0, height=30.0)
+        return cls(width=50.0, length=50.0, height=30.0)
 
 
 class VirtualSpeaker(NumpyArrayModel):
@@ -175,20 +177,22 @@ class SceneVisualizer:
         self.ax.set_xlim(0, dims[0])
         self.ax.set_ylim(0, dims[1])
         self.ax.set_zlim(0, dims[2])
-        self.ax.set_box_aspect([1, 1, dims[2]/max(dims[:2])])
-        
-        # Draw room wireframe (grey cube)
-        for x in [0, dims[0]]:
-            for y in [0, dims[1]]:
-                self.ax.plot([x, x], [y, y], [0, dims[2]], color='grey', lw=0.5)
-        for x in [0, dims[0]]:
-            for z in [0, dims[2]]:
-                self.ax.plot([x, x], [0, dims[1]], [z, z], color='grey', lw=0.5)
-        for y in [0, dims[1]]:
-            for z in [0, dims[2]]:
-                self.ax.plot([0, dims[0]], [y, y], [z, z], color='grey', lw=0.5)
+        self.ax.set_box_aspect([1, 1, 1])
+        # self.ax.set_box_aspect([1, 1, dims[2]/max(dims[:2])])
+
+        # # Draw room wireframe (grey cube)
+        # for x in [0, dims[0]]:
+        #     for y in [0, dims[1]]:
+        #         self.ax.plot([x, x], [y, y], [0, dims[2]], color='grey', lw=0.5)
+        # for x in [0, dims[0]]:
+        #     for z in [0, dims[2]]:
+        #         self.ax.plot([x, x], [0, dims[1]], [z, z], color='grey', lw=0.5)
+        # for y in [0, dims[1]]:
+        #     for z in [0, dims[2]]:
+        #         self.ax.plot([0, dims[0]], [y, y], [z, z], color='grey', lw=0.5)
     
     def _add_azimuth_elevation_triangles(self, origin: np.ndarray, target: np.ndarray, radius: float):
+        
         """Add triangles showing azimuth and elevation from origin to target."""
         # Calculate azimuth and elevation
         azim_deg, elev_deg, distance = calculate_azimuth_elevation(origin, target)
@@ -210,12 +214,23 @@ class SceneVisualizer:
         elev_y = origin[1] + elev_xy_dist * np.sin(azim_rad)
         elev_z = origin[2] + proj_radius * np.sin(elev_rad)
         
-        # Draw azimuth triangle (xy plane)
+        # Draw the complete triangle
         self.ax.plot(
-            [origin[0], azim_x, azim_x, origin[0]],
-            [origin[1], origin[1], azim_y, origin[1]],
-            [origin[2], origin[2], origin[2], origin[2]],
-            'b--', alpha=0.7, linewidth=1
+            [origin[0], azim_x, azim_x, origin[0]],  # x-coordinates - complete triangle
+            [origin[1], origin[1], azim_y, origin[1]],  # y-coordinates - complete triangle
+            [origin[2], origin[2], origin[2], origin[2]],  # z-coordinates - complete triangle
+            'b-',  # Solid line
+            alpha=0.7, 
+            linewidth=1
+        )
+        
+        # Add markers at the vertices for better visibility
+        self.ax.scatter(
+            [origin[0], azim_x, azim_x],
+            [origin[1], origin[1], azim_y],
+            [origin[2], origin[2], origin[2]],
+            color='b',
+            s=20  # Size of the markers
         )
         
         # Draw elevation triangle (vertical plane)
@@ -226,23 +241,23 @@ class SceneVisualizer:
             'g--', alpha=0.7, linewidth=1
         )
         
-        # Add angle labels
-        label_offset = proj_radius * 0.3
-        self.ax.text(
-            origin[0] + label_offset * np.cos(azim_rad/2),
-            origin[1] + label_offset * np.sin(azim_rad/2),
-            origin[2],
-            f"Az: {azim_deg:.1f}°",
-            color='blue', fontsize=8
-        )
+        # # Add angle labels
+        # label_offset = proj_radius * 0.3
+        # self.ax.text(
+        #     origin[0] + label_offset * np.cos(azim_rad/2),
+        #     origin[1] + label_offset * np.sin(azim_rad/2),
+        #     origin[2],
+        #     f"Az: {azim_deg:.1f}°",
+        #     color='blue', fontsize=8
+        # )
         
-        self.ax.text(
-            origin[0] + label_offset * np.cos(azim_rad) * 0.7,
-            origin[1] + label_offset * np.sin(azim_rad) * 0.7,
-            origin[2] + label_offset * 0.5,
-            f"El: {elev_deg:.1f}°",
-            color='green', fontsize=8
-        )
+        # self.ax.text(
+        #     origin[0] + label_offset * np.cos(azim_rad) * 0.7,
+        #     origin[1] + label_offset * np.sin(azim_rad) * 0.7,
+        #     origin[2] + label_offset * 0.5,
+        #     f"El: {elev_deg:.1f}°",
+        #     color='green', fontsize=8
+        # )
         
         return azim_deg, elev_deg, distance
     
@@ -270,7 +285,11 @@ class SceneVisualizer:
         resolution: int = 30
     ):
         """
-        Add a spherical quadrant (1/8th of a sphere) centered at the mic array.
+        Add a spherical quadrant (1/4 of a sphere) showing only the upper hemisphere (z > 0)
+        in the positive x half-space, centered at the specified point.
+        
+        This creates a quarter-sphere visualization showing only the space above the array
+        in the forward direction.
         
         Args:
             center: Center point of the quadrant [x, y, z]
@@ -280,8 +299,8 @@ class SceneVisualizer:
             resolution: Number of points for the mesh (higher = smoother)
         """
         # Create spherical coordinates for one octant (x>0, y>0, z>0)
-        phi = np.linspace(0, np.pi/2, resolution)  # 0 to 90 degrees
-        theta = np.linspace(0, np.pi/2, resolution)  # 0 to 90 degrees
+        phi = np.linspace(0, np.pi/2, resolution)  # 0 to 90 degrees azimuth
+        theta = np.linspace(0, np.pi/2, resolution)  # 0 to 90 degrees elevation
         phi, theta = np.meshgrid(phi, theta)
         
         # Convert to Cartesian coordinates
@@ -289,12 +308,10 @@ class SceneVisualizer:
         y = radius * np.sin(theta) * np.sin(phi)
         z = radius * np.cos(theta)
         
-        # Create all 4 quadrants in the positive x half-space
+        # Create quadrants in the positive x half-space and z > 0 (upper hemisphere)
         quadrants = [
-            (x, y, z),                     # +y, +z
-            (x, -y, z),                    # -y, +z
-            (x, y, -z),                    # +y, -z
-            (x, -y, -z)                    # -y, -z
+            (x, y, z),     # +y, +z (front-right-up)
+            (x, -y, z)     # -y, +z (front-left-up)
         ]
         
         # Plot each quadrant
@@ -399,11 +416,15 @@ class DigitalTwinConfig(NumpyArrayModel):
     hemisphere_radius: float = 25.0
     view_limits: Dict[str, Tuple[float, float]] = Field(
         default_factory=lambda: {
-            'x': (-5.0, 30.0),
+            'x': (0.0, 50.0),
             'y': (0.0, 50.0),
             'z': (0.0, 30.0)
         },
         description="View limits for the 3D plot"
+    )
+    png_save_dir: str = Field(
+        default="./saved_plots",
+        description="Directory to save PNG visualizations"
     )
     
     @field_validator('mic_center', mode='before')

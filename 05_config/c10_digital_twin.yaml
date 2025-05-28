@@ -5,6 +5,7 @@ speaker:
   direction: [0.5773502691896258, 0.5773502691896258, 0.5773502691896258]
 hemisphere_radius: 25.0
 view_limits:
-  x: [-5.0, 30.0]
+  x: [0.0, 30.0]
   y: [0.0, 50.0]
   z: [0.0, 30.0]
+png_save_dir: "/home/tj/99_tmp/10 - drone acoustic data/99_tmp/"

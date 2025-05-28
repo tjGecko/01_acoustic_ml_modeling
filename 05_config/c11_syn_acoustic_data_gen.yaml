@@ -1,0 +1,31 @@
+pyroomacoustics:
+  dimensions: [50.0, 50.0, 30.0]          # [x, y, z] in meters. 
+  fs_hz: 16000                            # Sampling rate in Hz
+  max_order: 0                            # Free-field condition (no reflections)
+  abs_wall: 1.0                           # Perfectly absorbent walls (non-reflective)
+  abs_floor: 0.35                         # Simulates ground absorption like grass
+  abs_ceiling: 1.0                        # Perfectly absorbent ceiling
+  air_absorption: true                   # Simulate frequency-dependent air attenuation
+
+mics:
+  xml_path: "/home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root/05_config/uma_16_mic_array.xml"  # Mic array XML config file (SO-VITESS format)
+  position: [0.0, 25.0, 0.3048]              # Placed at center of East wall (x=50)
+  mic_array_type: "minidsp_uma16.xml"
+  mic_array_info: "Collection of criteria for the mic array"
+
+grid:
+  radius: 25.0                            # Distance from speaker to mic center (meters)
+  az_start: 0                            # Azimuth angle start (degrees)
+  az_end: 355                            # Azimuth angle end (degrees)
+  el_start: 0                          # Elevation angle start (degrees)
+  el_end: 90                             # Elevation angle end (degrees)
+  step: 5                                # Step size in degrees for both azimuth and elevation
+
+capture_metadata:
+  wav_files_json: "05_config/clean_wav_registry.json"
+  output_dir: "/home/tj/99_tmp/11 - synthetic mic array data/01_time_domain/"
+  author: "TJ Hoeft"
+  author_info: "Who ran the script to generate the capture"
+  capture_type: "synthetic"
+  capture_approach: "pyroomacoustics"
+  capture_info: "Collection of criteria for synthetic capture"
