@@ -47,70 +47,100 @@ def load_mic_xml(path):
 
 def define_virtual_env(cfg: Dict[str, Any]) -> Dict[str, Any]:
     acfg = cfg['AcousticSimulationConfig']
+    room_cfg = acfg.pyroomacoustics        # ← rename for clarity
 
     # ---------- build room ----------
-    absorption = [acfg.room.abs_wall] * 4 + [acfg.room.abs_floor, acfg.room.abs_ceiling]
+    # absorption = [room_cfg.abs_wall] * 4 + [room_cfg.abs_floor, room_cfg.abs_ceiling]
+    # https://pyroomacoustics.readthedocs.io/en/pypi-release/pyroomacoustics.materials.database.html
+
     room = pra.ShoeBox(
-        acfg.room.dimensions,
-        fs=acfg.room.fs,
-        max_order=acfg.room.max_order,
-        materials=pra.Material(absorption),
-        air_absorption=acfg.room.air_absorption
+        room_cfg.dimensions,
+        fs=room_cfg.fs_hz,
+        max_order=room_cfg.max_order,
+        materials=pra.Material('fibre_absorber_2'),
+        air_absorption=room_cfg.air_absorption,
     )
 
-    mic_array = pra.MicrophoneArray(cfg['mic_coords'] + np.c_[acfg.mics.position].T, acfg.room.fs)
+    mic_center = np.c_[acfg.mics.position].T         # shape (3,1)
+    mic_array = pra.MicrophoneArray(cfg['mic_coords'] + mic_center, room_cfg.fs_hz)
     room.add_microphone_array(mic_array)
 
-    cfg['sim_env'] = {
-        'room': room,
-        'mic_array': mic_array
-    }
-
+    cfg['sim_env'] = {'room': room, 'mic_array': mic_array}
     return cfg
 
 
-def generate_data(cfg: Dict[str, Any]) -> Dict[str, Any]:
+def get_virtual_speaker_position(azimuth_deg, elevation_deg, acfg: AcousticSimulationConfig):
+    # Convert azimuth and elevation to radians
+    az_rad = np.deg2rad(azimuth_deg)
+    el_rad = np.deg2rad(elevation_deg)
+
+    # Calculate direction vector components
+    x = np.cos(el_rad) * np.cos(az_rad)
+    y = np.cos(el_rad) * np.sin(az_rad)
+    z = np.sin(el_rad)
+    src_vec = np.array([x, y, z])
+
+    # Compute source position
+    src_pos = acfg.mics.position + acfg.grid.radius * src_vec
+
+    return src_pos
+
+
+def generate_data(cfg: Dict[str, Any], wav_path, az, el) -> Dict[str, Any]:
     room = cfg['sim_env']['room']
     acfg = cfg['AcousticSimulationConfig']
-    wav_cfgs = cfg['wav_cfgs']
+
+    # --- place speaker (e.g. virtual drone) ---
+    src_pos = get_virtual_speaker_position(az, el, acfg)
+
+    signal, sr = sf.read(wav_path.resolve(), dtype='float32')
+    room.add_source(src_pos, signal=signal)
+
+    # # --- attenuation ---
+    # dist = np.linalg.norm(src_pos - acfg.mics.position)
+    # room.sources[0].signal = scale_signal(signal, dist)
+
+    # --- simulate & save ---
+    room.simulate()
+    rec = room.mic_array.signals.T  # shape: (nsamples, n_mics)
+
+    npy_name = f"{wav_path.stem}_az{az:03d}_el{el:+03d}.npy"
+    np.save(acfg.data.output_dir / npy_name, rec)
+
+    meta = {
+        # "header": cfg.data.meta_header,
+        # "generated": cfg.data.run_tag,
+        # "wav": str(wav_path),
+        # "distance_m": acfg.grid.radius,
+        # "azimuth_deg": az,
+        # "elevation_deg": el,
+        # "n_mics": rec.shape[1],
+        "script": __file__
+    }
+    with open(acfg.data.output_dir / (npy_name.replace('.npy', '.json')), 'w') as f:
+        json.dump(meta, f, indent=2)
+
+
+def generate_data_loop(cfg: Dict[str, Any]) -> None:
+    acfg = cfg['AcousticSimulationConfig']
+    wav_prov = cfg['wav_cfgs']['header']
+    wav_cfgs = cfg['wav_cfgs']['entries']
 
     # Build angles for grid coverage
     az_vals = range(acfg.grid.az_start, acfg.grid.az_end + 1, acfg.grid.step)
     el_vals = range(acfg.grid.el_start, acfg.grid.el_end + 1, acfg.grid.step)
+    debug_ct = 0
+    debug_trigger = 3
 
     for az, el in itertools.product(az_vals, el_vals):
-        # --- place speaker (e.g. virtual drone) ---
-        src_vec = pra.direction_vector(np.deg2rad(az), np.deg2rad(el))
-        src_pos = acfg.mics.position + acfg.grid.radius * src_vec
-        room.remove_all_sources()
+        if debug_ct < debug_trigger:
+            debug_ct += 1
+        else:
+            break
 
-        wav_path = Path(wav_cfgs[0]['file_path'])     # fixme: Hard coded
-        signal, sr = sf.read(wav_path.resolve(), dtype='float32')
-        room.add_source(src_pos, signal=signal)
-
-        # # --- attenuation ---
-        # dist = np.linalg.norm(src_pos - acfg.mics.position)
-        # room.sources[0].signal = scale_signal(signal, dist)
-
-        # --- simulate & save ---
-        room.simulate()
-        rec = room.mic_array.signals.T  # shape: (nsamples, n_mics)
-
-        npy_name = f"{wav_path.stem}_az{az:03d}_el{el:+03d}.npy"
-        np.save(acfg.data.output_dir / npy_name, rec)
-
-        meta = {
-            "header": cfg.data.meta_header,
-            "generated": cfg.data.run_tag,
-            "wav": str(wav_path),
-            "distance_m": acfg.grid.radius,
-            "azimuth_deg": az,
-            "elevation_deg": el,
-            "n_mics": rec.shape[1],
-            "script": __file__
-        }
-        with open(acfg.data.output_dir / (npy_name.replace('.npy', '.json')), 'w') as f:
-            json.dump(meta, f, indent=2)
+        wav_path = Path(wav_cfgs[0]['file_path'])  # fixme: Hard coded
+        cfg = define_virtual_env(cfg)
+        cfg = generate_data(cfg, wav_path, az, el)
 
 
 if __name__ == '__main__':
@@ -119,4 +149,6 @@ if __name__ == '__main__':
     project_root = current_dir.parents[2]  # Go up to s10_src directory
     wav_json = Path('clean_wav_registry.json')
 
-    acfg = load_configs(project_root)
+    cfg = load_configs(project_root)
+    generate_data_loop(cfg)
+
