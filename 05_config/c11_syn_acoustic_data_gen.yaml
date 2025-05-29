@@ -1,15 +1,16 @@
+# https://pyroomacoustics.readthedocs.io/en/pypi-release/pyroomacoustics.materials.database.html
 pyroomacoustics:
   dimensions: [50.0, 50.0, 30.0]          # [x, y, z] in meters. 
   fs_hz: 16000                            # Sampling rate in Hz
   max_order: 0                            # Free-field condition (no reflections)
-  abs_wall: 1.0                           # Perfectly absorbent walls (non-reflective)
-  abs_floor: 0.35                         # Simulates ground absorption like grass
-  abs_ceiling: 1.0                        # Perfectly absorbent ceiling
+  abs_wall: "panel_fabric_covered_8pcf"
+  abs_floor: "panel_fabric_covered_8pcf"
+  abs_ceiling: "panel_fabric_covered_8pcf"
   air_absorption: true                   # Simulate frequency-dependent air attenuation
 
 mics:
   xml_path: "/home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root/05_config/uma_16_mic_array.xml"  # Mic array XML config file (SO-VITESS format)
-  position: [0.0, 25.0, 0.3048]              # Placed at center of East wall (x=50)
+  position: [0.5, 25.0, 1.0]              # Placed at center of East wall (x=50)
   mic_array_type: "minidsp_uma16.xml"
   mic_array_info: "Collection of criteria for the mic array"
 

@@ -8,9 +8,9 @@ class PyroomacousticsCfg(BaseModel):
     dimensions: Tuple[float, float, float] = (50.0, 50.0, 30.0)
     fs_hz: int = 16000
     max_order: int = 0
-    abs_wall: float = 1.0
-    abs_floor: float = 0.35
-    abs_ceiling: float = 1.0
+    abs_wall: str = 'panel_fabric_covered_8pcf'
+    abs_floor: str = 'panel_fabric_covered_8pcf'
+    abs_ceiling: str = 'panel_fabric_covered_8pcf'
     air_absorption: bool = True
 
 class MicConfig(BaseModel):
