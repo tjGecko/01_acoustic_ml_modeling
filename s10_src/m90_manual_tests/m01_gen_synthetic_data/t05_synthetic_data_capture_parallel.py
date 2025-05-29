@@ -8,6 +8,8 @@ import shutil
 import numpy as np, xml.etree.ElementTree as ET
 import pyroomacoustics as pra
 import soundfile as sf
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import copy
 
 from s10_src.m05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
 
@@ -132,6 +134,13 @@ def get_virtual_speaker_position(azimuth_deg, elevation_deg, acfg: AcousticSimul
     return src_pos
 
 
+def generate_single_run(args):
+    cfg, wav_path, az, el = args
+    cfg_copy = define_virtual_env(cfg.copy())
+    generate_data(cfg_copy, wav_path, az, el)
+
+
+
 def generate_data(cfg: Dict[str, Any], wav_path: Path, az: int, el: int) -> None:  # Return type should be None
     sim_env = cfg['sim_env']
     room = sim_env['room']
@@ -229,29 +238,29 @@ def define_save_location(cfg: Dict[str, Any]) -> None:
     return cfg
 
 
-def generate_data_loop(cfg: Dict[str, Any]) -> None:
+def generate_data_loop(cfg: Dict[str, Any], max_workers: int = None) -> None:
     acfg = cfg['AcousticSimulationConfig']
     wav_cfgs = cfg['wav_cfgs']['entries']
-
-    # Build angles for grid coverage
     az_vals = range(acfg.grid.az_start, acfg.grid.az_end + 1, acfg.grid.step)
     el_vals = range(acfg.grid.el_start, acfg.grid.el_end + 1, acfg.grid.step)
 
-    debug_ct = 0
-    debug_trigger = 3
-
+    task_args = []
     for az, el in itertools.product(az_vals, el_vals):
-        if debug_trigger > 0 and debug_ct >= debug_trigger :
-            print(f"Debug limit ({debug_trigger} iterations) reached.")
-            break
-        debug_ct += 1
-        print(f"\nProcessing: Azimuth={az}, Elevation={el} (Iteration {debug_ct})")
-
         for wav_cfg in wav_cfgs:
             wav_path = Path(wav_cfg['file_path'])
-            # Re-define the environment for each run to ensure a clean state
-            current_run_cfg_modified = define_virtual_env(cfg.copy()) # Pass a copy if define_virtual_env modifies input dict cfg directly
-            generate_data(current_run_cfg_modified, wav_path, az, el) # Does not return/reassign
+            task_args.append((copy.deepcopy(cfg), wav_path, az, el))  # deepcopy ensures isolation
+
+    print(f"\n� Dispatching {len(task_args)} tasks across workers...")
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(generate_single_run, args) for args in task_args]
+
+        for i, f in enumerate(as_completed(futures), 1):
+            try:
+                f.result()
+                print(f"[{i}/{len(futures)}] ✅ Completed task")
+            except Exception as e:
+                print(f"[{i}/{len(futures)}] ❌ Error: {e}")
 
 
 if __name__ == '__main__':
@@ -281,7 +290,7 @@ if __name__ == '__main__':
     cfg = define_save_location(cfg)
 
     start = time.time()
-    generate_data_loop(cfg)
+    generate_data_loop(cfg, max_workers=3)
     duration_seconds = time.time() - start
     readable = time.strftime('%H:%M:%S', time.gmtime(duration_seconds))
     print(f"Function runtime: {readable}")
