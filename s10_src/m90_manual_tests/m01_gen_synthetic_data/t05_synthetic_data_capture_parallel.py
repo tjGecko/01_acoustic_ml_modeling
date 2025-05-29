@@ -139,7 +139,11 @@ def generate_single_run(args):
     cfg_copy = define_virtual_env(cfg.copy())
     generate_data(cfg_copy, wav_path, az, el)
 
-
+def is_disk_near_full(path: Path, threshold: float = 0.85) -> bool:
+    """Returns True if disk usage is above the given threshold (e.g., 0.85 for 85%)."""
+    usage = shutil.disk_usage(path)
+    used_ratio = usage.used / usage.total
+    return used_ratio >= threshold
 
 def generate_data(cfg: Dict[str, Any], wav_path: Path, az: int, el: int) -> None:  # Return type should be None
     sim_env = cfg['sim_env']
@@ -243,10 +247,13 @@ def generate_data_loop(cfg: Dict[str, Any], max_workers: int = None) -> None:
     wav_cfgs = cfg['wav_cfgs']['entries']
     az_vals = range(acfg.grid.az_start, acfg.grid.az_end + 1, acfg.grid.step)
     el_vals = range(acfg.grid.el_start, acfg.grid.el_end + 1, acfg.grid.step)
-
     task_args = []
+
     for az, el in itertools.product(az_vals, el_vals):
         for wav_cfg in wav_cfgs:
+            if is_disk_near_full(Path(cfg['header']['data_dir_path'])):
+                print("❌ Aborting: Disk usage exceeds 85% threshold.")
+                return
             wav_path = Path(wav_cfg['file_path'])
             task_args.append((copy.deepcopy(cfg), wav_path, az, el))  # deepcopy ensures isolation
 

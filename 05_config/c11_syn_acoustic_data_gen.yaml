@@ -24,7 +24,7 @@ grid:
 
 capture_metadata:
   wav_files_json: "05_config/clean_wav_registry.json"
-  output_dir: "/home/tj/99_tmp/11 - synthetic mic array data/01_time_domain/"
+  output_dir: "/media/tj/Samsung_T5/Ziz/01_time_domain/"
   author: "TJ Hoeft"
   author_info: "Who ran the script to generate the capture"
   capture_type: "synthetic"
