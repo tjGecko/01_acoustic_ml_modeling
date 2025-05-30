@@ -97,7 +97,8 @@ def update(attr, old, new):
     mapper.high = tdoa_matrix.max()
 
 # ---------- Main ----------
-npy_path = Path("/home/tj/99_tmp/11 - synthetic mic array data/01_time_domain/capture_2025_05_29/data/Membo_1_047-membo_003__az000_el+00.npy")  # <--- UPDATE ME
+# npy_path = Path("/home/tj/99_tmp/11 - synthetic mic array data/01_time_domain/capture_2025_05_29/data/Membo_1_047-membo_003__az000_el+00.npy")  # <--- UPDATE ME
+npy_path = Path("/media/tj/Samsung_T5/Ziz/01_time_domain/capture_2025_05_29/data/mixed_46-bebop_001__az090_el+30.npy")  # <--- UPDATE ME
 mic_data = load_mic_array_data(npy_path)
 initial_window = mic_data[:WINDOW_SIZE]
 tdoa_matrix = compute_pairwise_tdoa(initial_window, SAMPLE_RATE)
@@ -139,5 +140,5 @@ description_panel = Div(text=interpretation_text, width=400)
 # ---------- Layout & Display ----------
 layout = row(column(slider, heatmap), description_panel)
 
-output_file("tdoa_heatmap_with_info.html")
+output_file("tdoa_heatmap_mixed_46.html")
 show(layout)

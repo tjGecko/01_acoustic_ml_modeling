@@ -237,15 +237,15 @@ def generate_data_loop(cfg: Dict[str, Any]) -> None:
     az_vals = range(acfg.grid.az_start, acfg.grid.az_end + 1, acfg.grid.step)
     el_vals = range(acfg.grid.el_start, acfg.grid.el_end + 1, acfg.grid.step)
 
-    debug_ct = 0
-    debug_trigger = 3
+    # debug_ct = 0
+    # debug_trigger = 3
 
     for az, el in itertools.product(az_vals, el_vals):
-        if debug_trigger > 0 and debug_ct >= debug_trigger :
-            print(f"Debug limit ({debug_trigger} iterations) reached.")
-            break
-        debug_ct += 1
-        print(f"\nProcessing: Azimuth={az}, Elevation={el} (Iteration {debug_ct})")
+        # if debug_trigger > 0 and debug_ct >= debug_trigger :
+        #     print(f"Debug limit ({debug_trigger} iterations) reached.")
+        #     break
+        # debug_ct += 1
+        # print(f"\nProcessing: Azimuth={az}, Elevation={el} (Iteration {debug_ct})")
 
         for wav_cfg in wav_cfgs:
             wav_path = Path(wav_cfg['file_path'])
