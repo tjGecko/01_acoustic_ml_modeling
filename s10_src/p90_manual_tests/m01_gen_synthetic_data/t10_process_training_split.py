@@ -17,6 +17,14 @@ from pathlib import Path
 import yaml
 from tqdm import tqdm
 from typing import Dict, List, Tuple, Optional
+import sys
+
+# Add the project root to the Python path
+project_root = Path(__file__).parents[3]
+sys.path.append(str(project_root))
+
+# Import the timer decorator
+from s10_src.p55_util.f01_timer_decorator import exe_duration
 
 def parse_angle_from_filename(filename: str) -> Tuple[Optional[float], Optional[float]]:
     """Parse azimuth and elevation from filename.
@@ -96,7 +104,7 @@ def process_numpy_file(file_path: Path, output: Dict, config: Dict) -> None:
         az, el = parse_angle_from_filename(file_path.name)
         
         # Generate file hash
-        file_hash = generate_file_hash(data)
+        # file_hash = generate_file_hash(data)
         
         # Get segmentation parameters
         samples_per_segment = config['segmentation']['samples_per_segment']
@@ -115,6 +123,15 @@ def process_numpy_file(file_path: Path, output: Dict, config: Dict) -> None:
             start = i * step
             end = start + samples_per_segment
             segment = data[..., start:end]
+            
+            # Apply min-max scaling to the segment
+            min_val = np.min(segment, axis=-1, keepdims=True)
+            max_val = np.max(segment, axis=-1, keepdims=True)
+            # Avoid division by zero in case of constant segment
+            range_val = max_val - min_val
+            range_val[range_val == 0] = 1.0  # Set range to 1.0 to avoid division by zero
+            # Scale to [0, 1] range
+            segment = (segment - min_val) / range_val
             
             # Generate unique filename using hash and segment index
             segment_hash = generate_file_hash(segment)
@@ -142,6 +159,7 @@ def process_numpy_file(file_path: Path, output: Dict, config: Dict) -> None:
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
 
+@exe_duration
 def main():
     project_dir = Path(__file__).parents[3]
     # Load configuration
