@@ -243,6 +243,7 @@ def create_data_loaders(
         random.seed(seed)
     
     # Load the config
+    print(f'Config path: {config_path}')
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
