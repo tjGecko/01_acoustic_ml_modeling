@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 13:18:46
 # RUN DATE: 2025-05-31 13:18:23
 # RUN DATE: 2025-05-31 13:17:14
 # RUN DATE: 2025-05-31 13:14:30
@@ -296,7 +297,7 @@ if __name__ == "__main__":
     from s10_src.p20_ml_model.dl01_time_series_16_channels import create_data_loaders
 
     script = Path(__file__)
-    project_root = script.parents[3]
+    project_root = script.parents[2]
     config_path = project_root / "05_config/c12_t10_training_split.yaml"
     print(f'Loading config from {config_path}')
 
