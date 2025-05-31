@@ -341,8 +341,10 @@ def get_sample_shape(config_path: Union[str, Path]) -> Tuple[int, int]:
 
 # Example usage
 if __name__ == "__main__":
-    # Example configuration
-    config_path = "05_config/c12_t10_training_split.yaml"
+    script = Path(__file__)
+    project_root = script.parents[2]
+    config_path = project_root / "05_config/c12_t10_training_split.yaml"
+    # config_path = "05_config/c12_t10_training_split.yaml"
     
     # Create data loaders
     train_loader, test_loader, config = create_data_loaders(
