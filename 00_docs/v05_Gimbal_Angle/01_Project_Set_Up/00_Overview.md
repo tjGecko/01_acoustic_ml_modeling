@@ -57,7 +57,7 @@ pip install -r requirements.txt
 ### Running Tests
 ```bash
 # From project root
-python -m s10_src.m90_manual_tests.t01_read_mic_array_xml
+python -m s10_src.p90_manual_tests.t01_read_mic_array_xml
 ```
 
 ## Naming Conventions

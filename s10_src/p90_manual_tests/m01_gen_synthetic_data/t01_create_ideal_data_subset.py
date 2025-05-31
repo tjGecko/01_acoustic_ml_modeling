@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Set
 from datetime import datetime
 
-from s10_src.m05_data_models.d02_clean_wav_registry import (
+from s10_src.p05_data_models.d02_clean_wav_registry import (
     CleanWavRegistry,
     DroneType
 )

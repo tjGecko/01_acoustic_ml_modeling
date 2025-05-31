@@ -11,7 +11,7 @@ import soundfile as sf
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import copy
 
-from s10_src.m05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
+from s10_src.p05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
 
 
 def load_configs(cfg: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,3 +1,9 @@
+https://dsp.stackexchange.com/questions/74574/understanding-gcc-phat-as-a-feature
+https://www.youtube.com/watch?v=q4o9eGjE658
+https://www.mathworks.com/help/phased/ref/gccphat.html
+https://www.isca-archive.org/interspeech_2021/salvati21_interspeech.pdf
+
+
 ### How to translate TDOA uncertainty into angular (DOA) error
 
 Below is a practical recipe—together with a **ready-to-run Python snippet** (figure displayed above)—that lets you estimate the 1-σ direction-of-arrival (DOA) error you can expect from GCC-PHAT on the **miniDSP UMA-16** array.

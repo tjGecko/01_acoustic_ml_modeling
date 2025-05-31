@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 # Import the data models
-from s10_src.m05_data_models.d03_digital_twin import (
+from s10_src.p05_data_models.d03_digital_twin import (
     DigitalTwinConfig,
     MicrophoneArray,
     SceneVisualizer as ModelSceneVisualizer,

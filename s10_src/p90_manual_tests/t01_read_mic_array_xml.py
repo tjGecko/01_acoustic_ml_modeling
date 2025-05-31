@@ -29,13 +29,13 @@ Setup and Execution:
 4. Run the script:
    ```bash
    # From the project root directory
-   python -m s10_src.m90_manual_tests.t01_read_mic_array_xml
+   python -m s10_src.p90_manual_tests.t01_read_mic_array_xml
    ```
 
    Alternatively, you can run it directly:
    ```bash
    # From the project root directory
-   python s10_src/m90_manual_tests/t01_read_mic_array_xml.py
+   python s10_src/p90_manual_tests/t01_read_mic_array_xml.py
    ```
 
 Expected Output:
@@ -47,11 +47,11 @@ Expected Output:
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from s10_src.m05_data_models.d01_physical_mic_array import MicrophoneArray
+from s10_src.p05_data_models.d01_physical_mic_array import MicrophoneArray
 
 
 # Import the data models from the project's data models module
-# from m05_data_models.d01_physical_mic_array import MicrophoneArray
+# from p05_data_models.d01_physical_mic_array import MicrophoneArray
 
 
 def main():

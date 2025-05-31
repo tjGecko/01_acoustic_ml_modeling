@@ -9,7 +9,7 @@ import numpy as np, xml.etree.ElementTree as ET
 import pyroomacoustics as pra
 import soundfile as sf
 
-from s10_src.m05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
+from s10_src.p05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
 
 
 def load_configs(cfg: Dict[str, Any]) -> Dict[str, Any]:

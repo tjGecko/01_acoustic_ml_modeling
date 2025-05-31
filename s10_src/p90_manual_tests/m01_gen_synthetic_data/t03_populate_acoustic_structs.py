@@ -8,7 +8,7 @@ import os
 import importlib.util
 from pprint import pprint
 
-from s10_src.m05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
+from s10_src.p05_data_models.d04_acoustic_sim_env import AcousticSimulationConfig
 
 # Add the project root to the Python path
 current_dir = Path(__file__).resolve().parent
@@ -16,7 +16,7 @@ project_root = current_dir.parents[2]  # Go up to s10_src directory
 # sys.path.insert(0, str(project_root.parent))
 #
 # # Import the module directly from the file path
-# module_path = project_root / 'm05_data_models' / 'd04_acoustic_sim_env.py'
+# module_path = project_root / 'p05_data_models' / 'd04_acoustic_sim_env.py'
 # spec = importlib.util.spec_from_file_location("acoustic_sim_env", module_path)
 # acoustic_sim_env = importlib.util.module_from_spec(spec)
 # sys.modules["acoustic_sim_env"] = acoustic_sim_env

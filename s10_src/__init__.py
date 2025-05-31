@@ -10,7 +10,7 @@ __author__ = 'TJ Hoeft <tj.hoeft@gmail.com>'
 __license__ = 'MIT'
 
 # Import key components to make them available at the package level
-# Example: from .m05_data_models import MicrophoneArray
+# Example: from .p05_data_models import MicrophoneArray
 
 __all__ = [
     # List public API here

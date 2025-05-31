@@ -63,7 +63,7 @@ The main script performs these steps:
 
 ```bash
 # From the project root
-python -m s10_src.m90_manual_tests.m01_gen_synthetic_data.t01_create_ideal_data_subset
+python -m s10_src.p90_manual_tests.m01_gen_synthetic_data.t01_create_ideal_data_subset
 ```
 
 ### Expected Output
