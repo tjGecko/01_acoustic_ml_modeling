@@ -7,11 +7,12 @@ efficiently loading and batching 16-channel audio data for machine learning.
 
 import os
 import json
+import yaml
 import torch
 import random
 import numpy as np
 from pathlib import Path
-from typing import Tuple, Dict, List, Optional, Union
+from typing import Tuple, Dict, List, Optional, Union, Callable
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 
@@ -22,88 +23,144 @@ class TimeSeries16ChannelDataset(Dataset):
     
     Args:
         manifest_path: Path to the manifest JSON file
-        data_dir: Base directory containing the data files
-        transform: Optional transform to apply to the data
-        target_transform: Optional transform to apply to the targets
-        shuffle: Whether to shuffle the data
-        seed: Random seed for reproducibility
+        data_dir: Base directory where the data files are stored. If None, uses the directory
+                 containing the manifest file.
+        transform: Optional transform to be applied to the data
+        target_transform: Optional transform to be applied to the target
+        shuffle: Whether to shuffle the dataset
+        seed: Random seed for shuffling
+        is_test: Whether this is a test dataset (uses test_dir instead of train_dir)
     """
     
     def __init__(
         self,
         manifest_path: Union[str, Path],
         data_dir: Optional[Union[str, Path]] = None,
-        transform=None,
-        target_transform=None,
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
         shuffle: bool = True,
-        seed: int = 42
+        seed: Optional[int] = 42,
+        is_test: bool = False
     ) -> None:
-        super().__init__()
-        self.manifest_path = Path(manifest_path)
-        self.data_dir = Path(data_dir) if data_dir else self.manifest_path.parent
+        """
+        Initialize the dataset.
+        
+        Args:
+            manifest_path: Path to the manifest JSON file
+            data_dir: Base directory where the data files are stored. If None, uses the directory
+                     containing the manifest file.
+            transform: Optional transform to be applied to the data
+            target_transform: Optional transform to be applied to the target
+            shuffle: Whether to shuffle the dataset
+            seed: Random seed for shuffling
+            is_test: Whether this is a test dataset (uses test_dir instead of train_dir)
+        """
+        self.manifest_path = Path(manifest_path).resolve()
+        self.data_dir = Path(data_dir).resolve() if data_dir else self.manifest_path.parent
         self.transform = transform
         self.target_transform = target_transform
+        self.shuffle = shuffle
+        self.seed = seed
+        self.is_test = is_test
         
-        # Load manifest
+        # Load the manifest
         with open(self.manifest_path, 'r') as f:
-            self.manifest = json.load(f)
+            manifest = json.load(f)
         
-        # Store samples and their paths
-        self.samples = self.manifest.get('samples', [])
+        # Extract config and samples from the manifest
+        self.config = manifest.get('config', {})
+        if 'samples' not in manifest:
+            raise ValueError("Manifest file must contain a 'samples' key")
+            
+        # Get the base directory for this dataset (train or test)
+        training_splits = self.config.get('training_splits', {})
+        self.base_dir = Path(training_splits.get('test_dir' if is_test else 'train_dir', ''))
         
-        # Set random seed if shuffle is True
-        if shuffle:
-            random.seed(seed)
+        if not self.base_dir:
+            raise ValueError("Manifest config is missing required 'training_splits' with 'train_dir' and 'test_dir'")
+            
+        # Make sure the base directory exists
+        if not self.base_dir.exists():
+            raise FileNotFoundError(f"Base directory not found: {self.base_dir}")
+        
+        # Filter samples based on is_test flag
+        self.samples = [
+            {**sample, 'is_test': sample.get('is_test', False)}
+            for sample in manifest['samples']
+            if sample.get('is_test', False) == is_test
+        ]
+        
+        if not self.samples:
+            raise ValueError(f"No {'test' if is_test else 'training'} samples found in the manifest")
+        
+        if self.shuffle:
+            random.seed(self.seed)
             random.shuffle(self.samples)
         
-        # Verify all files exist
+        # Add base_dir to each sample for path resolution
+        for sample in self.samples:
+            sample['base_dir'] = self.base_dir
+        
+        # Validate that all required files exist
         self._validate_files()
     
     def _validate_files(self) -> None:
-        """Verify that all files in the manifest exist."""
+        """
+        Validate that all required files exist.
+        Raises FileNotFoundError if any files are missing.
+        """
         missing_files = []
-        for sample in self.samples:
-            # Handle both relative and absolute paths in the manifest
-            segment_file = sample.get('segment_file')
-            if not segment_file:
-                segment_file = sample.get('original_file', '')
+        
+        for i, sample in enumerate(self.samples):
+            if 'segment_file' not in sample:
+                raise ValueError(f"Sample at index {i} is missing required 'segment_file' field")
             
-            # Try both the segment file name and the original file name
-            possible_paths = [
-                self.data_dir / segment_file,
-                self.data_dir / Path(segment_file).name,
-                self.data_dir / sample.get('original_file', '')
-            ]
-            
-            # Check if any of the possible paths exist
-            if not any(p.exists() for p in possible_paths if p):
-                missing_files.append(segment_file)
+            try:
+                # This will raise FileNotFoundError if the file doesn't exist
+                file_path = self._find_data_file(sample)
+            except FileNotFoundError as e:
+                missing_files.append(str(e))
         
         if missing_files:
-            print(f"Warning: {len(missing_files)} files listed in manifest not found. "
-                  f"First missing file: {missing_files[0]}")
-            print("This might be expected if you're using a subset of the data.")
-            # Don't raise an error, just warn and continue with the files we have
+            error_msg = f"Error: {len(missing_files)} segment files not found. "
+            error_msg += f"First error: {missing_files[0]}"
+            raise FileNotFoundError(error_msg)
     
     def __len__(self) -> int:
         return len(self.samples)
     
     def _find_data_file(self, sample_info: Dict) -> Path:
-        """Find the correct data file path from sample info."""
-        # Try different possible file paths
-        possible_paths = [
-            self.data_dir / sample_info['segment_file'],
-            self.data_dir / Path(sample_info['segment_file']).name,
-            self.data_dir / sample_info.get('original_file', '')
-        ]
+        """
+        Find the data file path from the sample info.
         
-        for path in possible_paths:
-            if path and path.exists():
-                return path
+        Args:
+            sample_info: Dictionary containing file information from the manifest
+            
+        Returns:
+            Path to the data file
+        """
+        if 'segment_file' not in sample_info:
+            raise KeyError(f"Sample is missing required 'segment_file' field: {sample_info}")
         
-        raise FileNotFoundError(
-            f"Could not find data file for sample: {sample_info}"
-        )
+        # Get the base directory that was set in __init__
+        base_dir = sample_info.get('base_dir')
+        if not base_dir:
+            raise ValueError("Sample is missing required 'base_dir' field. This should be set during dataset initialization.")
+            
+        # Build the full path using the base directory and segment file
+        file_path = Path(base_dir) / sample_info['segment_file']
+        
+        # Resolve any relative paths and normalize
+        file_path = file_path.resolve()
+        
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Segment file not found: {file_path}. "
+                f"Original file: {sample_info.get('original_file', 'unknown')}. "
+                f"Base dir: {base_dir}"
+            )
+            
+        return file_path
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict]:
         """
@@ -159,52 +216,79 @@ def create_data_loaders(
     pin_memory: bool = True,
     shuffle_train: bool = True,
     shuffle_test: bool = False,
-    seed: int = 42
-) -> Tuple[DataLoader, DataLoader, dict]:
+    seed: Optional[int] = 42,
+    **kwargs
+) -> Tuple[DataLoader, DataLoader, Dict]:
     """
-    Create training and validation data loaders from a config file.
+    Create data loaders for training and testing.
     
     Args:
-        config_path: Path to the training split config YAML file
-        batch_size: Number of samples per batch
+        config_path: Path to the YAML configuration file
+        batch_size: Batch size for both training and testing
         num_workers: Number of worker processes for data loading
         pin_memory: Whether to pin memory for faster GPU transfer
-        shuffle_train: Whether to shuffle training data
-        shuffle_test: Whether to shuffle test data
+        shuffle_train: Whether to shuffle the training data
+        shuffle_test: Whether to shuffle the test data
         seed: Random seed for reproducibility
+        **kwargs: Additional keyword arguments to pass to the DataLoader
         
     Returns:
-        tuple: (train_loader, test_loader, config) where config is the loaded config dict
+        Tuple of (train_loader, test_loader, data_info) where data_info is a dictionary
+        containing information about the dataset
     """
-    import yaml
+    # Set random seeds for reproducibility
+    if seed is not None:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
     
-    # Load config
+    # Load the config
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
-    # Set random seeds for reproducibility
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    
-    # Create datasets
-    train_dir = Path(config['training_splits']['train_dir'])
-    test_dir = Path(config['training_splits']['test_dir'])
+    # Get the manifest path from config
     manifest_path = Path(config['training_splits']['manifest'])
     
-    train_dataset = TimeSeries16ChannelDataset(
-        manifest_path=manifest_path,
-        data_dir=train_dir,
-        shuffle=shuffle_train,
-        seed=seed
-    )
-    
-    test_dataset = TimeSeries16ChannelDataset(
-        manifest_path=manifest_path,
-        data_dir=test_dir,
-        shuffle=shuffle_test,
-        seed=seed
-    )
+    try:
+        # Create training dataset
+        train_dataset = TimeSeries16ChannelDataset(
+            manifest_path=manifest_path,
+            data_dir=manifest_path.parent,  # Use manifest directory as data_dir
+            shuffle=shuffle_train,
+            seed=seed,
+            is_test=False  # This will filter for training samples
+        )
+        
+        # Verify we can load at least one training sample
+        try:
+            train_sample = train_dataset[0]
+            print(f"Successfully loaded training sample. Data shape: {train_sample[0].shape}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load training sample: {str(e)}") from e
+        
+        # Create test dataset
+        test_dataset = TimeSeries16ChannelDataset(
+            manifest_path=manifest_path,
+            data_dir=manifest_path.parent,  # Use manifest directory as data_dir
+            shuffle=shuffle_test,
+            seed=seed,
+            is_test=True  # This will filter for test samples
+        )
+        
+        # Verify we can load at least one test sample
+        try:
+            test_sample = test_dataset[0]
+            print(f"Successfully loaded test sample. Data shape: {test_sample[0].shape}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load test sample: {str(e)}") from e
+            
+    except Exception as e:
+        error_msg = (
+            "Failed to initialize datasets. Please check the configuration and manifest file.\n"
+            f"Manifest path: {manifest_path}\n"
+            f"Error: {str(e)}"
+        )
+        raise RuntimeError(error_msg) from e
     
     # Create data loaders
     train_loader = DataLoader(
@@ -213,7 +297,7 @@ def create_data_loaders(
         shuffle=shuffle_train,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        drop_last=True
+        **kwargs
     )
     
     test_loader = DataLoader(
@@ -222,10 +306,18 @@ def create_data_loaders(
         shuffle=shuffle_test,
         num_workers=num_workers,
         pin_memory=pin_memory,
-        drop_last=False
+        **kwargs
     )
     
-    return train_loader, test_loader, config
+    # Prepare data info
+    data_info = {
+        'train_samples': len(train_dataset),
+        'test_samples': len(test_dataset),
+        'input_shape': train_sample[0].shape if 'train_sample' in locals() else None,
+        'target_keys': list(train_sample[1].keys()) if 'train_sample' in locals() else []
+    }
+    
+    return train_loader, test_loader, data_info
 
 
 def get_sample_shape(config_path: Union[str, Path]) -> Tuple[int, int]:
