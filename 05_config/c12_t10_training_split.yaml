@@ -1,0 +1,9 @@
+training_splits:
+  input_dir: "/home/tj/99_tmp/11 - synthetic mic array data/01_time_domain/"  # *.npy of 16 channel mic time series
+  train_dir: "/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/01_training_split/"
+  test_dir: "/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/02_test_split/"
+  manifest: "/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/manifest.json"
+
+segmentation:
+  samples_per_segment: 4096
+  sliding_win_offset: 512
