@@ -10,7 +10,7 @@ plt.style.use('seaborn-whitegrid')
 sns.set_palette("Set2")
 
 # Load the tensor data
-input_tensor_path = Path("/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/02_test_split/0afbfc45400a5cedba38fdbef067688c.npy")
+input_tensor_path = Path("/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/02_test_split/0a9531edb76ba24ed18bd4285c12fa32.npy")
 tensor_data = np.load(input_tensor_path)
 
 # Extract the first channel (assuming shape is [channels, time_steps, features])
