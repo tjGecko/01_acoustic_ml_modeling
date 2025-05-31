@@ -1,3 +1,5 @@
+# RUN DATE: 2025-05-31 12:26:51
+# RUN DATE: 2025-05-31 12:26:07
 import os
 
 import torch
@@ -13,6 +15,8 @@ from dotenv import load_dotenv
 import wandb
 
 from s10_src.p20_ml_model.m02_gcc_phat_features import GCCPHATFeatures
+from s10_src.p55_util.f02_script_comments import insert_run_date_comment
+from s10_src.p55_util.f03_auto_git import auto_commit_and_get_hash
 
 
 # from p10_ml_model.p05_training_strategies.s01_Patience import PatienceEarlyStopping
@@ -20,7 +24,7 @@ from s10_src.p20_ml_model.m02_gcc_phat_features import GCCPHATFeatures
 # from p55_util.f03_auto_git import auto_commit_and_get_hash
 
 # todo add data loader
-# todo look at normalization for input data
+# todo add min/max normalization for input data
 
 def initialize_wandb(project_name="my_project"):
     # Initialize the WandB run
@@ -202,55 +206,129 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
     print("Training complete.")
 
 
+class AngleNormalizer:
+    """Normalize angles to [-1, 1] range for training."""
+    def __init__(self, az_range=(-90, 90), el_range=(-90, 90)):
+        self.az_range = az_range
+        self.el_range = el_range
+
+    def normalize(self, az, el):
+        """Normalize angles to [-1, 1] range."""
+        az_norm = 2 * (az - self.az_range[0]) / (self.az_range[1] - self.az_range[0]) - 1
+        el_norm = 2 * (el - self.el_range[0]) / (self.el_range[1] - self.el_range[0]) - 1
+        return az_norm, el_norm
+
+    def denormalize(self, az_norm, el_norm):
+        """Convert normalized angles back to original range."""
+        az = (az_norm + 1) * (self.az_range[1] - self.az_range[0]) / 2 + self.az_range[0]
+        el = (el_norm + 1) * (self.el_range[1] - self.el_range[0]) / 2 + self.el_range[0]
+        return az, el
+
+
+def collate_fn(batch):
+    """Custom collate function to handle the dictionary structure of our dataset."""
+    inputs = torch.stack([item[0] for item in batch])  # Stack audio tensors
+    
+    # Extract and normalize angles
+    az = torch.tensor([item[1]['azimuth'] for item in batch], dtype=torch.float32)
+    el = torch.tensor([item[1]['elevation'] for item in batch], dtype=torch.float32)
+    
+    # Normalize angles to [-1, 1] range
+    normalizer = AngleNormalizer(az_range=(0, 360), el_range=(-90, 90))
+    az_norm, el_norm = normalizer.normalize(az, el)
+    
+    # Stack normalized angles
+    targets = torch.stack([az_norm, el_norm], dim=1)
+    
+    return inputs, targets
+
+
 if __name__ == "__main__":
     load_dotenv()
 
     # Insert a unique RUN DATE comment into the script
-    # - This asserts a new commit hash for comparing hyperparam and script configs
     insert_run_date_comment(script_path=__file__)
 
-    # Check if GPU is available and set device accordingly
+    # Set up device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
 
     # Initialize Weights and Biases
-    # wandb.init(project="02_ML_Modem_PyTorch")
-    # Step 3: Initialize WandB and store the Git commit hash
-    initialize_wandb(project_name="02_ML_Modem_PyTorch")
+    initialize_wandb(project_name="sound_source_localization")
 
-    # Load the dataset
-    dataset = get_dataset()
+    # Configuration - Modified for quick test
+    config = {
+        'batch_size': 32,
+        'lr': 1e-4,
+        'epochs': 2,  # Only run 2 epochs for testing
+        'n_mics': 16,
+        'fs': 16000,
+        'n_samples': 4096,
+        'max_tau': 0.001,  # 1ms delay
+        'interp_factor': 4
+    }
 
-    # Split the dataset into 90% train and 10% test
-    train_dataset, test_dataset = split_dataset(dataset)
-
-    # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
-
-    # Peek into the dataset to determine input and output shapes
-    sample_input, sample_output = next(iter(train_loader))
-    input_size = sample_input.shape[1]
-    output_size = sample_output.shape[1]
-
-    # Initialize the model
-    # model = DenseNN(input_size=input_size, output_size=output_size)
-    model = DenseNN(
-        input_size=input_size,
-        output_size=output_size,
-        hidden_size=512,
-        num_hidden_layers=3,
-        dropout_rate=0.3
+    # Load data
+    from s10_src.p20_ml_model.dl01_time_series_16_channels import create_data_loaders
+    
+    # Get data loaders
+    train_loader, test_loader, _ = create_data_loaders(
+        config_path="05_config/c12_t10_training_split.yaml",
+        batch_size=config['batch_size'],
+        num_workers=4,
+        pin_memory=True,
+        shuffle_train=True,
+        shuffle_test=False
     )
+
+    # Update data loaders to use our custom collate function
+    train_loader.collate_fn = collate_fn
+    test_loader.collate_fn = collate_fn
+
+    # Initialize model
+    model = SoundSourceLocalizationCNN(
+        n_mics=config['n_mics'],
+        fs=config['fs'],
+        n_samples_in_frame=config['n_samples'],
+        max_tau=config['max_tau'],
+        interp_factor=config['interp_factor']
+    ).to(device)
+
+    # Log model architecture and config to wandb
+    wandb.config.update(config)
+    
+    # Print model summary
+    print("\nModel architecture:")
+    print(model)
+    print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+
+    # Initialize early stopping
+    class PatienceEarlyStopping:
+        def __init__(self, patience=10, min_delta=0):
+            self.patience = patience
+            self.min_delta = min_delta
+            self.counter = 0
+            self.best_loss = float('inf')
+            self.early_stop = False
+
+        def should_stop(self, val_loss):
+            if val_loss < self.best_loss - self.min_delta:
+                self.best_loss = val_loss
+                self.counter = 0
+            else:
+                self.counter += 1
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            return self.early_stop
 
     # Train the model
     train_model(
-        model,
-        train_loader,
-        test_loader,
+        model=model,
+        train_loader=train_loader,
+        test_loader=test_loader,
         early_stopping_strategy=PatienceEarlyStopping(patience=10),
-        epochs=200,
-        lr=1e-4,
+        epochs=config['epochs'],
+        lr=config['lr'],
         device=device
     )
 
