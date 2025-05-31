@@ -2,6 +2,13 @@
 
 ## Recent Changes
 
+### 1. GCC-PHAT Feature Visualization
+- Added `t04_gcc_phat_inspection.py` for analyzing cross-correlation between microphone pairs
+- Implemented visualization of Generalized Cross-Correlation with Phase Transform (GCC-PHAT)
+- Added support for analyzing specific microphone pairs (Mic 2 vs Mics 15, 9, 8, 14)
+- Generated time delay vs correlation plots for each pair
+- Saved visualizations to `02_eda/figures/` directory
+
 ### 1. Data Processing Pipeline Updates
 - Added min-max scaling to tensor segments in `t10_process_training_split.py`
 - Implemented safety checks for constant segments during normalization

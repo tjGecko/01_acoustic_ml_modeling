@@ -1,3 +1,6 @@
+# RUN DATE: 2025-05-31 19:37:22
+# RUN DATE: 2025-05-31 19:32:31
+# RUN DATE: 2025-05-31 19:27:00
 # RUN DATE: 2025-05-31 14:15:52
 import os
 
@@ -264,7 +267,7 @@ if __name__ == "__main__":
         'batch_size': 16,  # Reduced batch size to fit in GPU memory
         'gradient_accumulation_steps': 4,  # Simulate larger batch size
         'lr': 1e-4,
-        'epochs': 2,  # Only run 2 epochs for testing
+        'epochs': 20,
         'n_mics': 16,
         'fs': 16000,
         'n_samples': 4096,
