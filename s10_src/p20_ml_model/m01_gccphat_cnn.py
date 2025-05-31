@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 13:13:11
 # RUN DATE: 2025-05-31 13:05:34
 # RUN DATE: 2025-05-31 12:29:21
 # RUN DATE: 2025-05-31 12:28:07
@@ -80,7 +81,7 @@ class SoundSourceLocalizationCNN(nn.Module):
         # W_out1 = self.gcc_feature_length // 2
 
         # Conv2: 128 filters, 3x3 kernel, stride 1x1, padding 1.
-        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.relu2 = nn.ReLU()
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         # H_out2 = H_out1 // 2
@@ -98,16 +99,16 @@ class SoundSourceLocalizationCNN(nn.Module):
             self.flattened_size = dummy_after_conv2.numel()  # numel gives total number of elements
 
         # Fully Connected Layers
-        self.fc1 = nn.Linear(self.flattened_size, 256)
+        self.fc1 = nn.Linear(self.flattened_size, 128)
         self.relu_fc1 = nn.ReLU()
         self.dropout1 = nn.Dropout(0.5)
 
-        self.fc2 = nn.Linear(256, 256)
+        self.fc2 = nn.Linear(128, 128)
         self.relu_fc2 = nn.ReLU()
         self.dropout2 = nn.Dropout(0.5)
 
         # Output Layer: 2 units (azimuth, elevation) with Tanh activation
-        self.fc_out = nn.Linear(256, 2)
+        self.fc_out = nn.Linear(128, 2)
         self.tanh_out = nn.Tanh()  # Output between -1 and 1
 
     def forward(self, signals: torch.Tensor) -> torch.Tensor:
