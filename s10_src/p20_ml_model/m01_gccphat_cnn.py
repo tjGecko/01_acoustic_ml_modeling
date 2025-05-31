@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 13:17:14
 # RUN DATE: 2025-05-31 13:14:30
 # RUN DATE: 2025-05-31 13:13:11
 # RUN DATE: 2025-05-31 13:05:34
@@ -292,10 +293,14 @@ if __name__ == "__main__":
 
     # Load data
     from s10_src.p20_ml_model.dl01_time_series_16_channels import create_data_loaders
-    
+
+    project_root = Path(__file__).parent[3]
+    config_path = project_root / "05_config/c12_t10_training_split.yaml"
+    print(f'Loading config from {config_path}')
+
     # Get data loaders
     train_loader, test_loader, _ = create_data_loaders(
-        config_path="05_config/c12_t10_training_split.yaml",
+        config_path=config_path,
         batch_size=config['batch_size'],
         num_workers=4,
         pin_memory=True,
