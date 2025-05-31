@@ -2,6 +2,40 @@
 
 ## Recent Changes
 
+### 1. Exploratory Data Analysis (EDA) - Single Channel Analysis
+- Created `t03_single_channel_inspection.py` for analyzing tensor data
+- Implemented statistical analysis of the first channel from 16-channel audio data
+- Generated box plot visualization with detailed statistics using Matplotlib/Seaborn
+- Added support for both 2D and 3D tensor formats
+- Calculated key statistics: min, max, mean, median, standard deviation, and quartiles
+
+### 2. Data Visualization Enhancements
+- Implemented clean, publication-quality visualizations
+- Added jittered points to show data distribution
+- Included comprehensive statistics overlay
+- Saved visualizations in high-resolution PNG format
+
+### 3. Project Maintenance
+- Updated project dependencies in requirements.txt
+- Followed project naming conventions from 01_Planning.md
+- Documented all changes in the project status
+
+## Current Focus
+- Analyzing single-channel audio data characteristics
+- Validating data distribution across different channels
+- Documenting data preprocessing steps
+
+## Next Steps
+1. Extend analysis to all 16 channels for comparison
+2. Implement correlation analysis between channels
+3. Add support for interactive data exploration
+4. Document findings in the project wiki
+5. Prepare data for model training
+
+## Previous Changes
+
+### 1. Numpy File Processing Updates
+
 ### 1. Numpy File Processing Updates
 - Fixed numpy file processing to handle (time_samples, channels) format
 - Added automatic transposition to (channels, time_samples) for compatibility
@@ -33,7 +67,7 @@
 4. Add data augmentation steps if needed
 5. Prepare for model training with the processed data
 
-## Recent Changes
+## Previous Changes
 
 ### 1. Synthetic Data Generation Enhancements
 - Added support for processing multiple WAV files per angle configuration

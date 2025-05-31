@@ -1,23 +1,10 @@
-# RUN DATE: 2025-05-31 13:19:31
-# RUN DATE: 2025-05-31 13:18:46
-# RUN DATE: 2025-05-31 13:18:23
-# RUN DATE: 2025-05-31 13:17:14
-# RUN DATE: 2025-05-31 13:14:30
-# RUN DATE: 2025-05-31 13:13:11
-# RUN DATE: 2025-05-31 13:05:34
-# RUN DATE: 2025-05-31 12:29:21
-# RUN DATE: 2025-05-31 12:28:07
-# RUN DATE: 2025-05-31 12:26:51
-# RUN DATE: 2025-05-31 12:26:07
 import os
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-import torch.nn.functional as F
 
 from pathlib import Path
 from dotenv import load_dotenv
@@ -27,10 +14,6 @@ from s10_src.p20_ml_model.m02_gcc_phat_features import GCCPHATFeatures
 from s10_src.p55_util.f02_script_comments import insert_run_date_comment
 from s10_src.p55_util.f03_auto_git import auto_commit_and_get_hash
 
-
-# from p10_ml_model.p05_training_strategies.s01_Patience import PatienceEarlyStopping
-# from p55_util.f02_script_comments import insert_run_date_comment
-# from p55_util.f03_auto_git import auto_commit_and_get_hash
 
 # todo add data loader
 # todo add min/max normalization for input data
@@ -47,9 +30,6 @@ def initialize_wandb(project_name="my_project"):
         wandb.config.update({"git_commit_hash": git_commit_hash})
     else:
         print("Git commit hash not available.")
-
-
-
 
 
 class SoundSourceLocalizationCNN(nn.Module):
