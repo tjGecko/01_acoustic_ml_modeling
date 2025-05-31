@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 12:29:21
 # RUN DATE: 2025-05-31 12:28:07
 # RUN DATE: 2025-05-31 12:26:51
 # RUN DATE: 2025-05-31 12:26:07
@@ -160,17 +161,32 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
     for epoch in range(epochs):
         model.train()
         running_loss = 0.0
+        optimizer.zero_grad()
+        
         for i, (inputs, targets) in enumerate(train_loader):
             inputs, targets = inputs.to(device), targets.to(device)
-
-            optimizer.zero_grad()
+            
+            # Forward pass
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets) / config['gradient_accumulation_steps']
+            
+            # Backward pass with gradient accumulation
             loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
+            
+            # Update weights every gradient_accumulation_steps
+            if (i + 1) % config['gradient_accumulation_steps'] == 0 or (i + 1) == len(train_loader):
+                optimizer.step()
+                optimizer.zero_grad()
+            
+            running_loss += loss.item() * config['gradient_accumulation_steps']
+            
+            # Print memory usage
+            if i % 10 == 0:
+                print(f"Batch {i}/{len(train_loader)} - Loss: {loss.item() * config['gradient_accumulation_steps']:.4f}")
+                if torch.cuda.is_available():
+                    print(f"GPU Memory Allocated: {torch.cuda.memory_allocated()/1e9:.2f}GB")
+                    print(f"GPU Memory Cached: {torch.cuda.memory_reserved()/1e9:.2f}GB")
+        
         avg_train_loss = running_loss / len(train_loader)
 
         # Evaluate on test set
@@ -260,7 +276,8 @@ if __name__ == "__main__":
 
     # Configuration - Modified for quick test
     config = {
-        'batch_size': 32,
+        'batch_size': 8,  # Reduced batch size to fit in GPU memory
+        'gradient_accumulation_steps': 4,  # Simulate larger batch size
         'lr': 1e-4,
         'epochs': 2,  # Only run 2 epochs for testing
         'n_mics': 16,
