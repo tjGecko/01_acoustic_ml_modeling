@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 12:28:07
 # RUN DATE: 2025-05-31 12:26:51
 # RUN DATE: 2025-05-31 12:26:07
 import os
@@ -150,7 +151,8 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
     criterion = nn.MSELoss()
 
     # Initialize the scheduler after setting up the optimizer
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
+    print(f"Initial learning rate: {optimizer.param_groups[0]['lr']}")
 
     # Log training metrics to Weights and Biases
     wandb.watch(model, log="all")

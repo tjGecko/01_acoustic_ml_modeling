@@ -1,0 +1,39 @@
+{
+  "os": "Linux-6.8.0-60-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.10.12",
+  "startedAt": "2025-05-31T16:28:07.631148Z",
+  "program": "-m s10_src.p20_ml_model.m01_gccphat_cnn",
+  "git": {
+    "remote": "git@github.com:tjGecko/01_acoustic_ml_modeling.git",
+    "commit": "f41092eee3122014c7d34952fe719ee00692fe9e"
+  },
+  "root": "/home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root",
+  "host": "magnus",
+  "executable": "/home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root/venv/bin/python",
+  "cpu_count": 6,
+  "cpu_count_logical": 6,
+  "gpu": "NVIDIA GeForce GTX 1660",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1967317549056",
+      "used": "360123944960"
+    }
+  },
+  "memory": {
+    "total": "8249798656"
+  },
+  "cpu": {
+    "count": 6,
+    "countLogical": 6
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce GTX 1660",
+      "memoryTotal": "6442450944",
+      "cudaCores": 1408,
+      "architecture": "Turing"
+    }
+  ],
+  "cudaVersion": "12.6"
+}
