@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 14:15:52
 import os
 
 import torch
@@ -14,9 +15,6 @@ from s10_src.p20_ml_model.m02_gcc_phat_features import GCCPHATFeatures
 from s10_src.p55_util.f02_script_comments import insert_run_date_comment
 from s10_src.p55_util.f03_auto_git import auto_commit_and_get_hash
 
-
-# todo add data loader
-# todo add min/max normalization for input data
 
 def initialize_wandb(project_name="my_project"):
     # Initialize the WandB run
@@ -168,11 +166,11 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
             running_loss += loss.item() * config['gradient_accumulation_steps']
             
             # Print memory usage
-            if i % 10 == 0:
-                print(f"Batch {i}/{len(train_loader)} - Loss: {loss.item() * config['gradient_accumulation_steps']:.4f}")
-                if torch.cuda.is_available():
-                    print(f"GPU Memory Allocated: {torch.cuda.memory_allocated()/1e9:.2f}GB")
-                    print(f"GPU Memory Cached: {torch.cuda.memory_reserved()/1e9:.2f}GB")
+            # if i % 10 == 0:
+            #     print(f"Batch {i}/{len(train_loader)} - Loss: {loss.item() * config['gradient_accumulation_steps']:.4f}")
+            #     if torch.cuda.is_available():
+            #         print(f"GPU Memory Allocated: {torch.cuda.memory_allocated()/1e9:.2f}GB")
+            #         print(f"GPU Memory Cached: {torch.cuda.memory_reserved()/1e9:.2f}GB")
         
         avg_train_loss = running_loss / len(train_loader)
 
@@ -263,7 +261,7 @@ if __name__ == "__main__":
 
     # Configuration - Modified for quick test
     config = {
-        'batch_size': 8,  # Reduced batch size to fit in GPU memory
+        'batch_size': 16,  # Reduced batch size to fit in GPU memory
         'gradient_accumulation_steps': 4,  # Simulate larger batch size
         'lr': 1e-4,
         'epochs': 2,  # Only run 2 epochs for testing
@@ -342,87 +340,3 @@ if __name__ == "__main__":
         lr=config['lr'],
         device=device
     )
-
-# if __name__ == '__main__':
-#     # --- Parameters ---
-#     BATCH_SIZE = 32  # As requested
-#     N_MICS = 16  # As requested
-#     FS = 16000  # As requested
-#     N_SAMPLES = 4096  # As requested (frame length)
-#
-#     # Parameters from the paper / for GCC
-#     MAX_TAU_GCC = 0.001  # s (1ms, as suggested in paper for their array size)
-#     # Original code had 0.002s, which is also fine.
-#     # This affects N_c (gcc_feature_length)
-#     INTERP_FACTOR_GCC = 4  # L=4, as in paper
-#
-#     # --- Device ---
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     print(f"Using device: {device}")
-#
-#     # --- Test GCCPHATFeatures module ---
-#     print("\n--- Testing GCCPHATFeatures ---")
-#     gcc_module = GCCPHATFeatures(
-#         n_mics=N_MICS,
-#         fs=FS,
-#         n_samples_in_frame=N_SAMPLES,
-#         max_tau=MAX_TAU_GCC,
-#         interp_factor=INTERP_FACTOR_GCC
-#     ).to(device)
-#
-#     print(f"Number of microphone pairs (N_p): {gcc_module.n_pairs}")
-#     print(f"GCC feature length (N_c): {gcc_module.gcc_feature_length}")
-#
-#     # Create dummy batch of signals
-#     dummy_signals = torch.randn(BATCH_SIZE, N_MICS, N_SAMPLES).to(device)
-#     print(f"Input signals shape: {dummy_signals.shape}")
-#
-#     gcc_output = gcc_module(dummy_signals)
-#     print(f"Output GCC features shape: {gcc_output.shape}")
-#     # Expected: [BATCH_SIZE, n_pairs, gcc_feature_length]
-#     # e.g. N_MICS=16 -> n_pairs = 16*15/2 = 120
-#     # N_c for max_tau=0.001, fs=16k, interp=4:
-#     # max_shift_samples = ceil(0.001 * 16000 * 4) = ceil(64) = 64
-#     # gcc_feature_length = 2 * 64 + 1 = 129
-#     # Expected shape: [32, 120, 129]
-#     assert gcc_output.shape == (BATCH_SIZE, gcc_module.n_pairs, gcc_module.gcc_feature_length)
-#     print("GCCPHATFeatures test passed.")
-#
-#     # --- Test SoundSourceLocalizationCNN ---
-#     print("\n--- Testing SoundSourceLocalizationCNN ---")
-#     ssl_cnn_model = SoundSourceLocalizationCNN(
-#         n_mics=N_MICS,
-#         fs=FS,
-#         n_samples_in_frame=N_SAMPLES,
-#         max_tau=MAX_TAU_GCC,
-#         interp_factor=INTERP_FACTOR_GCC
-#     ).to(device)
-#
-#     print(f"CNN Model:\n{ssl_cnn_model}")
-#
-#     # Test with dummy signals
-#     predictions = ssl_cnn_model(dummy_signals)
-#     print(f"Output predictions shape: {predictions.shape}")
-#     # Expected: [BATCH_SIZE, 2]
-#     assert predictions.shape == (BATCH_SIZE, 2)
-#     print(f"Sample predictions (first 2 from batch):\n{predictions[:2]}")
-#     print("SoundSourceLocalizationCNN test passed.")
-#
-#     # --- Example Training Loop Snippet (conceptual) ---
-#     # optimizer = torch.optim.Adam(ssl_cnn_model.parameters(), lr=1e-4)
-#     # criterion = nn.MSELoss() # Or a custom angular loss
-#
-#     # # Dummy targets (azimuth, elevation) scaled to [-1, 1] like Tanh output
-#     # # In a real scenario, your ground truth angles (e.g., in degrees/radians)
-#     # # would need to be normalized to the [-1, 1] range if using Tanh.
-#     # # E.g., if azimuth is [-180, 180] -> target_az_norm = target_az_deg / 180.0
-#     # # E.g., if elevation is [-90, 90] -> target_el_norm = target_el_deg / 90.0
-#     # dummy_targets = torch.rand(BATCH_SIZE, 2).to(device) * 2 - 1 # Random values in [-1, 1]
-#
-#     # ssl_cnn_model.train()
-#     # optimizer.zero_grad()
-#     # output_preds = ssl_cnn_model(dummy_signals)
-#     # loss = criterion(output_preds, dummy_targets)
-#     # loss.backward()
-#     # optimizer.step()
-#     # print(f"\nConceptual training step: Loss = {loss.item()}")
