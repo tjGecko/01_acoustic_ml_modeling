@@ -123,3 +123,7 @@ pyrightconfig.json
 00_docs/v05_Gimbal_Angle/.obsidian/workspace.json
 
 # End of standard Python .gitignore
+
+# Weights & Biases
+wandb/
+.wandb/

@@ -1,5 +1,4 @@
 # RUN DATE: 2025-05-31 21:27:54
-
 import os
 
 import torch
@@ -13,6 +12,8 @@ from dotenv import load_dotenv
 import wandb
 
 from s10_src.p20_ml_model.m02_gcc_phat_features import GCCPHATFeatures
+from s10_src.p20_ml_model.u01_Early_Stopping import PatienceEarlyStopping
+from s10_src.p20_ml_model.u02_angle_normalizer import AngleNormalizer
 from s10_src.p55_util.f02_script_comments import insert_run_date_comment
 from s10_src.p55_util.f03_auto_git import auto_commit_and_get_hash
 
@@ -127,7 +128,7 @@ class SoundSourceLocalizationCNN(nn.Module):
 
 
 # Training function
-def train_model(model, train_loader, test_loader, early_stopping_strategy=None, epochs=200, lr=1e-3, device='cpu'):
+def train_model(model, train_loader, test_loader, early_stopping_strategy=None, epochs=200, lr=1e-3, device='cpu', checkpoint_dir='checkpoints'):
     # model.apply(init_he_weights)
     model.to(device)
     optimizer = optim.Adam(
@@ -141,8 +142,14 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5)
     print(f"Initial learning rate: {optimizer.param_groups[0]['lr']}")
 
+    # Create checkpoint directory if it doesn't exist
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
     # Log training metrics to Weights and Biases
     wandb.watch(model, log="all")
+    
+    # Initialize best test loss for checkpointing
+    best_test_loss = float('inf')
 
     for epoch in range(epochs):
         model.train()
@@ -203,30 +210,37 @@ def train_model(model, train_loader, test_loader, early_stopping_strategy=None, 
         # Step the scheduler based on the test loss
         scheduler.step(avg_test_loss)
 
+        # Save checkpoint if test loss improved
+        if avg_test_loss < best_test_loss:
+            best_test_loss = avg_test_loss
+            checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pth')
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': avg_train_loss,
+                'test_loss': avg_test_loss,
+            }, checkpoint_path)
+            print(f"Saved new best model checkpoint to {checkpoint_path} with test loss: {avg_test_loss:.6f}")
+            
+            # Also log the model to wandb
+            wandb.save(checkpoint_path)
+
         # Early stopping check
         if early_stopping_strategy and early_stopping_strategy.should_stop(avg_test_loss):
+            print(f"Early stopping triggered at epoch {epoch + 1}")
             break
 
     print("Training complete.")
-
-
-class AngleNormalizer:
-    """Normalize angles to [-1, 1] range for training."""
-    def __init__(self, az_range=(-90, 90), el_range=(-90, 90)):
-        self.az_range = az_range
-        self.el_range = el_range
-
-    def normalize(self, az, el):
-        """Normalize angles to [-1, 1] range."""
-        az_norm = 2 * (az - self.az_range[0]) / (self.az_range[1] - self.az_range[0]) - 1
-        el_norm = 2 * (el - self.el_range[0]) / (self.el_range[1] - self.el_range[0]) - 1
-        return az_norm, el_norm
-
-    def denormalize(self, az_norm, el_norm):
-        """Convert normalized angles back to original range."""
-        az = (az_norm + 1) * (self.az_range[1] - self.az_range[0]) / 2 + self.az_range[0]
-        el = (el_norm + 1) * (self.el_range[1] - self.el_range[0]) / 2 + self.el_range[0]
-        return az, el
+    
+    # # Load the best model weights before returning
+    # best_checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pth')
+    # if os.path.exists(best_checkpoint_path):
+    #     checkpoint = torch.load(best_checkpoint_path, map_location=device)
+    #     model.load_state_dict(checkpoint['model_state_dict'])
+    #     print(f"Loaded best model from epoch {checkpoint['epoch']} with test loss: {checkpoint['test_loss']:.6f}")
+    # else:
+    #     print("Warning: No checkpoint found to load best model")
 
 
 def collate_fn(batch):
@@ -313,23 +327,6 @@ if __name__ == "__main__":
     print(f"\nNumber of parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
     # Initialize early stopping
-    class PatienceEarlyStopping:
-        def __init__(self, patience=10, min_delta=0):
-            self.patience = patience
-            self.min_delta = min_delta
-            self.counter = 0
-            self.best_loss = float('inf')
-            self.early_stop = False
-
-        def should_stop(self, val_loss):
-            if val_loss < self.best_loss - self.min_delta:
-                self.best_loss = val_loss
-                self.counter = 0
-            else:
-                self.counter += 1
-                if self.counter >= self.patience:
-                    self.early_stop = True
-            return self.early_stop
 
     # Train the model
     train_model(
@@ -339,5 +336,6 @@ if __name__ == "__main__":
         early_stopping_strategy=PatienceEarlyStopping(patience=10),
         epochs=config['epochs'],
         lr=config['lr'],
-        device=device
+        device=device,
+        checkpoint_dir='/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/checkpoints/'
     )
