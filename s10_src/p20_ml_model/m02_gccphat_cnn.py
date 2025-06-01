@@ -1,3 +1,4 @@
+# RUN DATE: 2025-05-31 21:13:43
 # RUN DATE: 2025-05-31 20:06:22
 
 import os
@@ -85,11 +86,11 @@ class SoundSourceLocalizationCNN(nn.Module):
         # Fully Connected Layers
         self.fc1 = nn.Linear(self.flattened_size, 128)
         self.relu_fc1 = nn.ReLU()
-        self.dropout1 = nn.Dropout(0.5)
+        self.dropout1 = nn.Dropout(0.2)
 
         self.fc2 = nn.Linear(128, 128)
         self.relu_fc2 = nn.ReLU()
-        self.dropout2 = nn.Dropout(0.5)
+        self.dropout2 = nn.Dropout(0.2)
 
         # Output Layer: 2 units (azimuth, elevation) with Tanh activation
         self.fc_out = nn.Linear(128, 2)
@@ -303,8 +304,8 @@ if __name__ == "__main__":
 
     # Configuration - Modified for quick test
     config = {
-        'batch_size': 16,  # Reduced batch size to fit in GPU memory
-        'gradient_accumulation_steps': 4,  # Simulate larger batch size
+        'batch_size': 32,  # Reduced batch size to fit in GPU memory
+        'gradient_accumulation_steps': 2,  # Simulate larger batch size
         'lr': 1e-4,
         'epochs': 50,
         'n_mics': 16,
@@ -380,5 +381,6 @@ if __name__ == "__main__":
         early_stopping_strategy=PatienceEarlyStopping(patience=10),
         epochs=config['epochs'],
         lr=config['lr'],
-        device=device
+        device=device,
+        l1_lambda=0.005
     )

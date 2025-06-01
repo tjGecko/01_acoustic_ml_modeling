@@ -1,0 +1,44 @@
+_wandb:
+    value:
+        cli_version: 0.19.11
+        m: []
+        python_version: 3.10.12
+        t:
+            "1":
+                - 1
+                - 55
+                - 105
+            "2":
+                - 1
+                - 55
+                - 105
+            "3":
+                - 1
+                - 23
+                - 55
+            "4": 3.10.12
+            "5": 0.19.11
+            "8":
+                - 5
+            "12": 0.19.11
+            "13": linux-x86_64
+batch_size:
+    value: 16
+epochs:
+    value: 50
+fs:
+    value: 16000
+git_commit_hash:
+    value: 81c04afec9d3d4b4b45fce3fd3c1ff08b192b652
+gradient_accumulation_steps:
+    value: 4
+interp_factor:
+    value: 4
+lr:
+    value: 0.0001
+max_tau:
+    value: 0.001
+n_mics:
+    value: 16
+n_samples:
+    value: 4096
