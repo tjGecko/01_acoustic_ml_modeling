@@ -1,3 +1,4 @@
+# RUN DATE: 2025-06-01 15:34:09
 # RUN DATE: 2025-06-01 15:33:24
 # File: s10_train_cnn_model_vectorized.py (suggested new name)
 
@@ -402,7 +403,7 @@ if __name__ == "__main__":
         model=model,
         train_loader=train_loader,
         test_loader=test_loader,
-        early_stopping_strategy=PatienceEarlyStopping(patience=10, verbose=True),  # Monitor angular error or test loss
+        early_stopping_strategy=PatienceEarlyStopping(patience=10),  # Monitor angular error or test loss
         epochs=training_config['epochs'],
         lr=training_config['lr'],
         device=device,
