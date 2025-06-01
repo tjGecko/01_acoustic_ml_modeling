@@ -3,9 +3,7 @@ import numpy as np
 from pathlib import Path
 import sys
 
-# Add the parent directory to the path to import the module under test
-sys.path.append(str(Path(__file__).parent.parent / 'p20_ml_model'))
-from u02_angle_normalizer import AngleNormalizer
+from s10_src.p20_ml_model.u02_angle_normalizer import AngleNormalizer
 
 # Test cases for normalization
 NORMALIZATION_CASES = [

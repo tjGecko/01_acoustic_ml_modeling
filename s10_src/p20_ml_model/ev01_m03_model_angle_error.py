@@ -6,10 +6,13 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+import datetime
+from functools import partial # Import partial
 
 # Import the model and dataset classes
 from m03_m01_gccphat_cnn import SoundSourceLocalizationCNN
 from dl01_time_series_16_channels import TimeSeries16ChannelDataset, create_data_loaders
+from s10_src.p20_ml_model.u02_angle_normalizer import AngleNormalizer
 
 # Configuration
 CHECKPOINT_DIR = Path("/home/tj/99_tmp/11 - synthetic mic array data/02_training_data/checkpoints")
@@ -24,8 +27,7 @@ def load_best_model(checkpoint_dir, model_params, device='cpu'):
     # Look for the specific model file
     best_checkpoint = Path(checkpoint_dir) / "best_model.pth"
     if not best_checkpoint.exists():
-        # Fallback to looking for any .pt file if best_model.pth doesn't exist
-        checkpoints = list(Path(checkpoint_dir).glob("*.pth")) + list(Path(checkpoint_dir).glob("*.pt"))
+        checkpoints = list(Path(checkpoint_dir).glob("*.pth")) + list(Path(checkpoint_dir).glob("*.pt")) # Fixed glob pattern
         if not checkpoints:
             raise FileNotFoundError(f"No model checkpoints found in {checkpoint_dir}")
         best_checkpoint = checkpoints[0]  # Take the first one found
@@ -51,192 +53,176 @@ def load_best_model(checkpoint_dir, model_params, device='cpu'):
     model.eval()
     return model
 
-def denormalize_angles(normalized_angles, angle_ranges):
-    """Convert normalized angles back to original ranges."""
-    # Assuming normalized_angles are in range [-1, 1]
-    # and angle_ranges is a dict with 'azimuth' and 'elevation' ranges
-    denorm_angles = normalized_angles.copy()
-    for i, angle_type in enumerate(['azimuth', 'elevation']):
-        min_val, max_val = angle_ranges[angle_type]
-        denorm_angles[:, i] = (normalized_angles[:, i] + 1) * (max_val - min_val) / 2 + min_val
-    return denorm_angles
 
-def evaluate_model(model, test_loader, device='cpu'):
-    """Run evaluation on the test set and return predictions and ground truth."""
+def collate_fn(batch, normalizer):
+    """Custom collate function to handle the dictionary structure of our dataset."""
+    inputs = torch.stack([item[0] for item in batch])  # Stack audio tensors
+
+    # Extract and normalize angles
+    az = torch.tensor([item[1]['azimuth'] for item in batch], dtype=torch.float32)
+    el = torch.tensor([item[1]['elevation'] for item in batch], dtype=torch.float32)
+
+    # Normalize angles to [-1, 1] range
+    az_norm, el_norm = normalizer.normalize(az, el)
+
+    # Stack normalized angles
+    targets = torch.stack([az_norm, el_norm], dim=1)
+
+    return inputs, targets
+
+
+def denormalize_angles(normalized_angles, normalizer):
+    """Convert normalized angles back to original ranges using AngleNormalizer."""
+    if isinstance(normalized_angles, np.ndarray):
+        normalized_angles = torch.from_numpy(normalized_angles).float() # ensure float
+    
+    # Split into azimuth and elevation
+    az_norm = normalized_angles[:, 0]
+    el_norm = normalized_angles[:, 1] if normalized_angles.shape[1] > 1 else torch.zeros_like(az_norm)
+    
+    # Denormalize using the provided normalizer
+    az_denorm, el_denorm = normalizer.denormalize(az_norm, el_norm)
+    
+    # Stack back together
+    return torch.stack([az_denorm, el_denorm], dim=1).numpy()
+
+def evaluate_model(model, test_loader, device='cpu'): # Removed normalizer argument
+    """
+    Run evaluation on the test set and return predictions and ground truth.
+    
+    Args:
+        model: Trained model to evaluate
+        test_loader: DataLoader for the test set (already configured with collate_fn)
+        device: Device to run evaluation on
+        
+    Returns:
+        tuple: (all_preds, all_targets) where:
+            - all_preds: Normalized model predictions in [-1, 1] range
+            - all_targets: Normalized ground truth angles in [-1, 1] range
+    """
     all_preds = []
     all_targets = []
-    all_files = []
-    
-    # Print dataloader info
-    print("\nDataLoader Info:")
-    print(f"Number of batches: {len(test_loader)}")
-    if len(test_loader) > 0:
-        sample_batch = next(iter(test_loader))
-        print(f"Sample batch type: {type(sample_batch)}")
-        print(f"Sample batch length: {len(sample_batch) if hasattr(sample_batch, '__len__') else 'N/A'}")
-        print(f"Sample batch[0] shape: {sample_batch[0].shape if hasattr(sample_batch[0], 'shape') else 'N/A'}")
-        if len(sample_batch) > 1:
-            print(f"Sample batch[1] type: {type(sample_batch[1])}")
-            if isinstance(sample_batch[1], dict):
-                print("Sample batch[1] keys:", sample_batch[1].keys())
-            elif hasattr(sample_batch[1], 'shape'):
-                print(f"Sample batch[1] shape: {sample_batch[1].shape}")
-    
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
-            print(f"\nProcessing batch {batch_idx+1}/{len(test_loader)}")
-            
-            # Handle different batch formats
-            if isinstance(batch, (list, tuple)) and len(batch) == 2:
-                inputs, targets = batch
-                print(f"Batch contains inputs: {type(inputs)}, targets: {type(targets)}")
-            else:
-                print(f"Unexpected batch format: {type(batch)}")
-                continue
-                
-            # Move inputs to device
-            inputs = inputs.to(device)
-            print(f"Input shape: {inputs.shape}")
-            
-            # Forward pass
-            outputs = model(inputs)
-            print(f"Output shape: {outputs.shape}")
-            
-            # Store predictions
-            all_preds.append(outputs.cpu().numpy())
-            
-            # Process targets
-            print(f"Target type: {type(targets)}")
-            
-            if isinstance(targets, dict):
-                # Handle dictionary format
-                print("Target keys:", targets.keys())
-                if 'azimuth' in targets and 'elevation' in targets:
-                    batch_targets = torch.stack([
-                        targets['azimuth'].float(),
-                        targets['elevation'].float()
-                    ], dim=1).numpy()
-                    all_targets.append(batch_targets)
-                    all_files.extend(targets.get('original_file', [''] * len(batch_targets)))
-            elif isinstance(targets, torch.Tensor):
-                # Direct tensor format
-                print(f"Target shape: {targets.shape}")
-                all_targets.append(targets.numpy())
-                all_files.extend([''] * len(targets))
-            else:
-                print(f"Unhandled target type: {type(targets)}")
-                print(f"Target content: {targets}")
-    
-    # Print summary of collected data
-    print("\nCollected Data Summary:")
-    print(f"Number of prediction batches: {len(all_preds)}")
-    print(f"Number of target batches: {len(all_targets)}")
-    
-    if not all_preds:
-        raise ValueError("No predictions were made. Check the data loader output format.")
-    
-    try:
-        # Concatenate all batches
-        all_preds = np.vstack(all_preds) if len(all_preds[0].shape) > 1 else np.concatenate(all_preds)
-        if all_targets:
-            all_targets = np.vstack(all_targets) if len(all_targets[0].shape) > 1 else np.concatenate(all_targets)
-        else:
-            all_targets = np.zeros((len(all_preds), 2))  # Dummy targets if none found
-            
-        # Ensure we have the same number of predictions and targets
-        if len(all_preds) != len(all_targets):
-            print(f"Warning: Mismatch in number of predictions ({len(all_preds)}) and targets ({len(all_targets)})")
-            min_len = min(len(all_preds), len(all_targets))
-            all_preds = all_preds[:min_len]
-            all_targets = all_targets[:min_len]
-            
-        # Ensure filenames match predictions length
-        if len(all_files) != len(all_preds):
-            all_files = all_files[:len(all_preds)]
-            if len(all_files) < len(all_preds):
-                all_files.extend([''] * (len(all_preds) - len(all_files)))
-                
-    except Exception as e:
-        print(f"Error processing predictions/targets: {e}")
-        print(f"Predictions shape: {[p.shape for p in all_preds]}")
-        print(f"Targets shape: {[t.shape for t in all_targets]}")
-        raise
-    
-    return all_preds, all_targets, all_files
 
-def save_results(preds, targets, filenames, angle_ranges, output_path):
-    """Save predictions and ground truth to a CSV file."""
-    # Denormalize angles
-    denorm_preds = denormalize_angles(preds, angle_ranges)
-    denorm_targets = denormalize_angles(targets, angle_ranges)
+    with torch.no_grad():
+        for batch_data in tqdm(test_loader, desc="Evaluating"):
+            # Your custom_collate_fn returns (inputs, targets)
+            inputs, targets = batch_data  # Correctly unpack the 2-tuple
+
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            
+            # Store normalized predictions
+            all_preds.append(outputs.cpu().numpy())
+            all_targets.append(targets.cpu().numpy()) # targets are already on CPU from collate_fn
+            # If filenames were handled: all_filenames.extend(filenames_batch)
+
+    # Concatenate all batches
+    all_preds = np.vstack(all_preds) if all_preds else np.array([])
+    all_targets = np.vstack(all_targets) if all_targets else np.array([])
     
-    # Calculate errors
-    errors = np.abs(denorm_preds - denorm_targets)
+    # Ensure we have the same number of predictions and targets
+    min_len = min(len(all_preds), len(all_targets))
+    if min_len == 0:
+        raise ValueError("No predictions or targets were collected. Check the data loader output format.")
+
+    # All normalized angle data
+    all_preds = all_preds[:min_len]
+    all_targets = all_targets[:min_len]
+
+    return all_preds, all_targets
+
+def save_results(preds_norm, targets_norm, normalizer, output_path):
+    """
+    Save predictions and ground truth to a CSV file.
     
-    # Create DataFrame
+    Args:
+        preds_norm: Normalized model predictions in [-1, 1] range
+        targets_norm: Normalized ground truth angles in [-1, 1] range
+        normalizer: AngleNormalizer instance used for denormalization
+        output_path: Path to save the results CSV
+    """
+    denorm_preds_deg = denormalize_angles(preds_norm, normalizer)
+
+    # targets_norm are normalized. The column names like 'true_azimuth_dec'
+    # in the original code imply these might be the normalized decimal values.
+    # If actual degrees are desired for true angles, they also need denormalization:
+    # denorm_targets_deg = denormalize_angles(targets_norm, normalizer)
+    # For now, stick to original structure where 'true_..._dec' uses normalized values.
+
+    # Error calculation based on normalized values, as in original code
+    errors_normalized = np.abs(preds_norm - targets_norm)
+
     results = pd.DataFrame({
-        'filename': filenames,
-        'pred_azimuth': denorm_preds[:, 0],
-        'pred_elevation': denorm_preds[:, 1],
-        'true_azimuth': denorm_targets[:, 0],
-        'true_elevation': denorm_targets[:, 1],
-        'azimuth_error': errors[:, 0],
-        'elevation_error': errors[:, 1]
+        'true_azimuth_norm_dec': targets_norm[:, 0], # Normalized true angles
+        'true_elevation_norm_dec': targets_norm[:, 1], # Normalized true angles
+        'azimuth_error_norm_dec': errors_normalized[:, 0], # Error in normalized space
+        'elevation_error_norm_dec': errors_normalized[:, 1], # Error in normalized space
+        'total_error_norm_dec': np.sqrt(errors_normalized[:, 0]**2 + errors_normalized[:, 1]**2),
+        'pred_azimuth_deg': denorm_preds_deg[:, 0],
+        'pred_elevation_deg': denorm_preds_deg[:, 1],
+        'pred_az_norm_dec': preds_norm[:, 0],
+        'pred_el_norm_dec': preds_norm[:, 1] if preds_norm.shape[1] > 1 else np.zeros_like(preds_norm[:, 0])
     })
     
-    # Save to CSV
-    results.to_csv(output_path, index=False)
+
+    # Save results to CSV
+    results.to_csv(output_path, index=False, float_format='%.6f')
     print(f"Results saved to {output_path}")
-    
-    # Print summary statistics
-    print("\nError Summary:")
-    print(f"Mean Azimuth Error: {errors[:, 0].mean():.2f} degrees")
-    print(f"Mean Elevation Error: {errors[:, 1].mean():.2f} degrees")
-    print(f"Median Azimuth Error: {np.median(errors[:, 0]):.2f} degrees")
-    print(f"Median Elevation Error: {np.median(errors[:, 1]):.2f} degrees")
 
 def main():
-    # Model parameters - these should match the training configuration
+    # Model parameters (should match training configuration)
     model_params = {
-        'n_mics': 16,  # Assuming 16 microphones based on the dataset
-        'fs': 16000,   # Sample rate
+        'n_mics': 16,           # Number of microphones in the array
+        'fs': 16000,            # Sample rate (Hz)
         'n_samples_in_frame': 4096,  # Frame size
-        'max_tau': 0.001,  # Maximum time delay in seconds
-        'interp_factor': 4  # Interpolation factor for GCC-PHAT
+        'max_tau': 0.001,       # Maximum time delay in seconds
+        'interp_factor': 4      # Interpolation factor for GCC-PHAT
     }
+    # Initialize angle normalizer with the same ranges used during training
+    normalizer = AngleNormalizer(az_range=(0, 360), el_range=(-90, 90))
     
-    # Angle ranges for denormalization
-    angle_ranges = {
-        'azimuth': (0, 360),    # Full circle for azimuth
-        'elevation': (-40, 90)  # Typical range for elevation
-    }
+    # Create results directory with timestamp
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = RESULTS_DIR / f"eval_{timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load the test dataset
-    print("Loading test dataset...")
-    script = Path(__file__)
-    project_root = script.parents[2]
-    config_path = project_root / "05_config/c12_t10_training_split.yaml"
-    print(f'Loading config from {config_path}')
+    print(f"[INFO] Starting evaluation run: {timestamp}")
+    print(f"[INFO] Saving results to: {run_dir}")
 
-    _, test_loader, _ = create_data_loaders(
-        config_path=config_path,
+    # Load the best model
+    print("[INFO] Loading model...")
+    model = load_best_model(CHECKPOINT_DIR, model_params, device)
+    print("[INFO] Model loaded successfully")
+
+    # Print model architecture
+    print(f"[INFO] Model architecture:\n{model}")
+
+    # Load test dataset
+    print("[INFO] Loading test dataset...")
+    # Create a partial function for collate_fn with normalizer baked in
+    custom_collate_fn = partial(collate_fn, normalizer=normalizer)
+
+    # Correctly unpack: we only need the test_loader from the returned tuple
+    # The other returned values (train_loader, data_info) are ignored with _
+    _, test_loader_from_func, _ = create_data_loaders(
+        config_path=Path("/home/tj/02_Windsurf_Projects/r03_Gimbal_Angle_Root/05_config/c12_t10_training_split.yaml"),
         batch_size=32,
         num_workers=4,
-        shuffle_test=False,
-        pin_memory=torch.cuda.is_available()
+        collate_fn=custom_collate_fn
     )
-    
-    # Load the best model
-    print("Loading model...")
-    model = load_best_model(CHECKPOINT_DIR, model_params, device)
-    
+
     # Run evaluation
-    print("Running evaluation...")
-    preds, targets, filenames = evaluate_model(model, test_loader, device)
-    
+    print("[INFO] Starting evaluation...")
+    # evaluate_model no longer takes normalizer, no longer returns filenames (unless adapted)
+    preds_normalized, targets_normalized = evaluate_model(model, test_loader_from_func, device) # Pass the actual DataLoader
+
     # Save results
-    output_path = RESULTS_DIR / "angle_predictions.csv"
-    save_results(preds, targets, filenames, angle_ranges, output_path)
+    results_file = run_dir / "evaluation_results.csv"
+    # Call save_results with correct arguments
+    save_results(preds_normalized, targets_normalized, normalizer, results_file)
+
+    print("[INFO] Evaluation completed successfully!")
+        
 
 if __name__ == "__main__":
     main()
